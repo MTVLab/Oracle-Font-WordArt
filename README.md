@@ -23,7 +23,7 @@
 
 ### 2.3 对比实验
 
-![contrast](D:\developer\Oracle-Font-WordArt\asset\contrast.png)
+![contrast](asset/contrast.png)
 
 [^2]:[[2112.10752\] High-Resolution Image Synthesis with Latent Diffusion Models (arxiv.org)](https://arxiv.org/abs/2112.10752)
 [^3]:[[2302.05543\] Adding Conditional Control to Text-to-Image Diffusion Models (arxiv.org)](https://arxiv.org/abs/2302.05543)
