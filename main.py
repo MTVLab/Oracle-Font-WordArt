@@ -1,6 +1,12 @@
+'''
+Description: 
+Author: YuanJiang
+Date: 2024-07-07 20:47:07
+'''
+
 import os
 from tqdm import tqdm
-from losses import ConformalLoss, ISMLoss, SDSLoss
+from losses import ConformalLoss, ISMLoss, SDSLoss, ToneLoss
 from easydict import EasyDict as edict
 import torch
 from torch.optim.lr_scheduler import LambdaLR
@@ -15,12 +21,14 @@ from utils import (
     preprocess,
     learning_rate_decay,
     combine_word,
-    create_video,)
+    create_video, )
 import warnings
+
 warnings.filterwarnings("ignore")
 
 pydiffvg.set_print_timing(False)
 gamma = 1.0
+
 
 def init_shapes(svg_path):
     svg = f'{svg_path}.svg'
@@ -31,13 +39,13 @@ def init_shapes(svg_path):
     for path in shapes_init:
         path.points.requires_grad = True
         parameters.point.append(path.points)
-            
+
     return shapes_init, shape_groups_init, parameters
 
 
 if __name__ == "__main__":
-    # torch.manual_seed(1024)
     cfg = BaseConfig()
+    torch.manual_seed(cfg.seed)
 
     # use GPU if available
     pydiffvg.set_use_gpu(torch.cuda.is_available())
@@ -45,10 +53,14 @@ if __name__ == "__main__":
 
     print("preprocessing")
     preprocess(cfg.font, cfg.word, cfg.word, cfg.level_of_cc)
-
-    ism_loss = ISMLoss(model_path=cfg.model_path, device=device)
-    # ism_loss = SDSLoss(cfg, device=device)
-
+    if cfg.loss_type == 'ism':
+        loss_fn = ISMLoss(model_path=cfg.model_path, device=device)
+    elif cfg.loss_type == 'sds':
+        loss_fn = SDSLoss(cfg=cfg, device=device)
+    elif cfg.loss_type == 'clip':
+        pass
+    else:
+        raise ValueError("the {cfg.loss_type} is not support!")
     h, w = cfg.render_size, cfg.render_size
 
     data_augs = get_data_augs(cfg.cut_size)
@@ -58,8 +70,6 @@ if __name__ == "__main__":
     # initialize shape
     print('initializing shape')
     shapes, shape_groups, parameters = init_shapes(svg_path=cfg.target)
-    # TODO:
-    # chamfer_loss = ChamferLoss(copy.deepcopy(parameters))
 
     scene_args = pydiffvg.RenderFunction.serialize_scene(w, h, shapes, shape_groups)
     img_init = render(w, h, 2, 2, 0, None, *scene_args)
@@ -75,11 +85,15 @@ if __name__ == "__main__":
 
     num_iter = cfg.num_iter
     pg = [{'params': parameters["point"], 'lr': cfg.lr_base_point}]
-    optim = torch.optim.Adam(pg, betas=(0.9, 0.99), eps=1e-6)
+    optim = torch.optim.Adam(pg, betas=(0.9, 0.9), eps=1e-6)
 
     if cfg.use_conformal_loss:
         # TODO:
         conformal_loss = ConformalLoss(parameters, device, cfg.word, shape_groups)
+
+    if cfg.use_tone_loss:
+        tone_loss = ToneLoss(cfg)
+        tone_loss.set_image_init(img_init)
 
     lr_lambda = lambda step: learning_rate_decay(step, cfg.lr_init, cfg.lr_final, num_iter,
                                                  lr_delay_steps=cfg.lr_delay_steps,
@@ -95,9 +109,10 @@ if __name__ == "__main__":
         # render image
         scene_args = pydiffvg.RenderFunction.serialize_scene(w, h, shapes, shape_groups)
         img = render(w, h, 2, 2, step, None, *scene_args)
-        
+
         # compose image with white background
-        img = img[:, :, 3:4] * img[:, :, :3] + torch.ones(img.shape[0], img.shape[1], 3, device=device) * (1 - img[:, :, 3:4])
+        img = img[:, :, 3:4] * img[:, :, :3] + torch.ones(img.shape[0], img.shape[1], 3, device=device) * (
+                    1 - img[:, :, 3:4])
         img = img[:, :, :3]
 
         save_image(img, os.path.join(cfg.experiment_dir, "video-png", f"iter{step:04d}.png"), gamma)
@@ -106,20 +121,23 @@ if __name__ == "__main__":
         check_and_create_dir(filename)
         save_svg.save_svg(
             filename, w, h, shapes, shape_groups)
-            
+
         x = img.unsqueeze(0).permute(0, 3, 1, 2)  # HWC -> NCHW
         x = x.repeat(cfg.batch_size, 1, 1, 1)
         ## TODO:确定是否需要加入形变
-        x = x[:,:,238:362,330:452]
+        # x = x[:,:,105:181,270:346]
         x_aug = data_augs.forward(x)
-
-        loss = ism_loss(prompt_text=cfg.prompt_text,pred_rgb=x_aug)
-        # loss = ism_loss(x_aug)
+        if cfg.loss_type == 'ism':
+            loss = loss_fn(prompt_text=cfg.prompt_text, pred_rgb=x_aug, step=step)
+        elif cfg.loss_type == 'sds':
+            loss = loss_fn(x_aug)
 
         if cfg.use_conformal_loss:
             loss_angles = conformal_loss()
             loss_angles = cfg.conformal_angeles_w * loss_angles
             loss = loss + loss_angles
+        if cfg.use_tone_loss:
+            loss = loss + tone_loss(x, step)
 
         t_range.set_postfix({'loss': loss.item()})
         loss.backward()

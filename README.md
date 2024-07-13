@@ -19,13 +19,5 @@
 
 图中第1、2行为甲骨文字，第2、3行为字形变化后的文字，第4、5行为增加纹理后的文字。
 
-<img src="asset/example.png" alt="生肖" style="zoom: 80%;" />
+<img src="asset/example.png" alt="生肖" style="zoom: 100%;" />
 
-### 2.3 对比实验
-
-![contrast](asset/contrast.png)
-
-[^2]:[[2112.10752\] High-Resolution Image Synthesis with Latent Diffusion Models (arxiv.org)](https://arxiv.org/abs/2112.10752)
-[^3]:[[2302.05543\] Adding Conditional Control to Text-to-Image Diffusion Models (arxiv.org)](https://arxiv.org/abs/2302.05543)
-[^4]:[[2303.01818\] Word-As-Image for Semantic Typography (arxiv.org)](https://arxiv.org/abs/2303.01818)
-[^5]:[GitHub - songyiren98/CLIPFont: Implementation of paper: CLIPFont: Texture Guided Vector WordArt Generation](https://github.com/songyiren98/CLIPFont)
