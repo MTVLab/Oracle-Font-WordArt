@@ -29,20 +29,19 @@
    pip install svgwrite svgpathtools cssutils numba torch-tools scikit-fmm easydict visdom freetype-py shapely
    pip install opencv-python==4.5.4.60  
    pip install kornia==0.6.8
-   pip install wandb
    pip install shapely
    ```
-
+   
 3. 安装diffusers库（**使用扩散模型必须要了解的库**）
 
    ```sh
-   pip install diffusers==0.8
+   pip install diffusers
    pip install transformers scipy ftfy accelerate
    ```
 
    
 
-4. 安装diffvg库（**Linux环境下安装，windows需要配置c++的开发环境，太麻烦，我放弃了**）
+4. 安装diffvg库（**Linux环境下安装，windows需要配置c++的开发环境，太麻烦**）
 
    ```sh
    git clone https://github.com/BachiLi/diffvg.git
@@ -69,7 +68,9 @@
 
 ### 2.3 消融实验
 
-#### 2.3.1
+#### 2.3.1 不同的图文匹配方法的比较
+
+<img src=".\asset\loss_fn.png" alt="loss_fn" style="zoom:60%;" />
 
 
 

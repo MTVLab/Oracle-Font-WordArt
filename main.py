@@ -1,14 +1,16 @@
 '''
-Description: 
+Description: run this script to generate wordart.
 Author: YuanJiang
 Date: 2024-07-07 20:47:07
 '''
 
 import os
+import random
 from tqdm import tqdm
-from losses import ConformalLoss, ISMLoss, SDSLoss, ToneLoss
+from losses import ConformalLoss, ISMLoss, SDSLoss, ToneLoss, ClipLoss
 from easydict import EasyDict as edict
 import torch
+import numpy as np
 from torch.optim.lr_scheduler import LambdaLR
 import pydiffvg
 import save_svg
@@ -21,14 +23,12 @@ from utils import (
     preprocess,
     learning_rate_decay,
     combine_word,
-    create_video, )
+    create_video,)
 import warnings
-
 warnings.filterwarnings("ignore")
 
 pydiffvg.set_print_timing(False)
 gamma = 1.0
-
 
 def init_shapes(svg_path):
     svg = f'{svg_path}.svg'
@@ -39,13 +39,15 @@ def init_shapes(svg_path):
     for path in shapes_init:
         path.points.requires_grad = True
         parameters.point.append(path.points)
-
+            
     return shapes_init, shape_groups_init, parameters
 
 
 if __name__ == "__main__":
     cfg = BaseConfig()
     torch.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
+    random.seed(cfg.seed)
 
     # use GPU if available
     pydiffvg.set_use_gpu(torch.cuda.is_available())
@@ -58,7 +60,7 @@ if __name__ == "__main__":
     elif cfg.loss_type == 'sds':
         loss_fn = SDSLoss(cfg=cfg, device=device)
     elif cfg.loss_type == 'clip':
-        pass
+        loss_fn = ClipLoss(cfg=cfg, device=device)
     else:
         raise ValueError("the {cfg.loss_type} is not support!")
     h, w = cfg.render_size, cfg.render_size
@@ -90,10 +92,13 @@ if __name__ == "__main__":
     if cfg.use_conformal_loss:
         # TODO:
         conformal_loss = ConformalLoss(parameters, device, cfg.word, shape_groups)
-
+    
     if cfg.use_tone_loss:
         tone_loss = ToneLoss(cfg)
         tone_loss.set_image_init(img_init)
+    
+    if cfg.loss_type == 'clip':
+        loss_fn.image_source(img_init)
 
     lr_lambda = lambda step: learning_rate_decay(step, cfg.lr_init, cfg.lr_final, num_iter,
                                                  lr_delay_steps=cfg.lr_delay_steps,
@@ -109,10 +114,9 @@ if __name__ == "__main__":
         # render image
         scene_args = pydiffvg.RenderFunction.serialize_scene(w, h, shapes, shape_groups)
         img = render(w, h, 2, 2, step, None, *scene_args)
-
+        
         # compose image with white background
-        img = img[:, :, 3:4] * img[:, :, :3] + torch.ones(img.shape[0], img.shape[1], 3, device=device) * (
-                    1 - img[:, :, 3:4])
+        img = img[:, :, 3:4] * img[:, :, :3] + torch.ones(img.shape[0], img.shape[1], 3, device=device) * (1 - img[:, :, 3:4])
         img = img[:, :, :3]
 
         save_image(img, os.path.join(cfg.experiment_dir, "video-png", f"iter{step:04d}.png"), gamma)
@@ -121,15 +125,18 @@ if __name__ == "__main__":
         check_and_create_dir(filename)
         save_svg.save_svg(
             filename, w, h, shapes, shape_groups)
-
+            
         x = img.unsqueeze(0).permute(0, 3, 1, 2)  # HWC -> NCHW
         x = x.repeat(cfg.batch_size, 1, 1, 1)
         ## TODO:确定是否需要加入形变
-        # x = x[:,:,105:181,270:346]
-        x_aug = data_augs.forward(x)
+        # x = x[:,:,105:181,270:346] flower
+        if cfg.roi_box:
+            x_aug = data_augs.forward(x[:,:,cfg.roi_box[0]:cfg.roi_box[1],cfg.roi_box[2]:cfg.roi_box[3]])
+        else:
+            x_aug = data_augs.forward(x)
         if cfg.loss_type == 'ism':
-            loss = loss_fn(prompt_text=cfg.prompt_text, pred_rgb=x_aug, step=step)
-        elif cfg.loss_type == 'sds':
+            loss = loss_fn(prompt_text=cfg.prompt_text,pred_rgb=x_aug, step=step)
+        else:
             loss = loss_fn(x_aug)
 
         if cfg.use_conformal_loss:
@@ -137,7 +144,8 @@ if __name__ == "__main__":
             loss_angles = cfg.conformal_angeles_w * loss_angles
             loss = loss + loss_angles
         if cfg.use_tone_loss:
-            loss = loss + tone_loss(x, step)
+            import torchvision
+            loss = loss + tone_loss(torchvision.transforms.Resize(cfg.cut_size)(x[:,:,cfg.roi_box[0]:cfg.roi_box[1],cfg.roi_box[2]:cfg.roi_box[3]]), step)
 
         t_range.set_postfix({'loss': loss.item()})
         loss.backward()
