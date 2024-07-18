@@ -9,7 +9,7 @@
 1. 文字字形设计：甲骨文作为象形文字，结构复杂，笔画繁多且单个字符具备完整的含义，若以整个字符进行形变，会导致变形后的字符不可识别，因此以**字符的局部作为形变的对象**。
 1. 利用扩散模型（SD）和DDIM反演进行区间分数匹配，使文字轮廓与prompt提示语义相匹配。
 
-![pipeline](asset/pipeline.png)
+<img src="asset/pipeline.png" alt="pipeline" style="zoom: 50%;" align="left" />
 
 ### 1.2 环境配置（Ubuntu 20.04）
 
@@ -68,13 +68,17 @@
 
 图中第1、2行为甲骨文字，第2、3行为字形变化后的文字，第4、5行为增加纹理后的文字。
 
-<img src="asset/example.png" alt="生肖" style="zoom: 100%;" />
+<img src="asset/example.png" alt="生肖" style="zoom: 100%;" align="left"/>
 
 ### 2.3 消融实验
 
-#### 2.3.1 不同的图文匹配方法的比较
+#### 2.3.1 CLIP、SDS和ISM的对比
 
-<img src=".\asset\loss_fn.png" alt="loss_fn" style="zoom:60%;" />
+对比不同的对大规模预训练视觉-语言大模型进行蒸馏的方法。
+
+<img src=".\asset\loss_fn.png" alt="loss_fn" style="zoom:60%;" align="left"/>
+
+#### 2.3.2 控制点数量选择的对比（默认控制点or预设控制点）
 
 
 
