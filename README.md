@@ -76,9 +76,10 @@
 
 对比不同的对大规模预训练视觉-语言大模型进行蒸馏的方法。
 
-<img src=".\asset\loss_fn.png" alt="loss_fn" style="zoom:60%;" align="left"/>
+<img src=".\asset\loss_fn.png" alt="loss_fn" style="zoom:50%;" align="left"/>
 
 #### 2.3.2 控制点数量选择的对比（默认控制点or预设控制点）
 
+默认控制点和采样更多控制点的对比。
 
-
+<img src="asset\num_point.png" style="zoom:50%;" align="left"/>
